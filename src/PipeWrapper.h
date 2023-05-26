@@ -23,8 +23,9 @@ enum class PipeType {
     PipeClient
 };
 
-using PipeCmdCallback = std::function<void(void* ctx, const PipeCmd::Cmd& cmd)>;
-using CheckStopCallback = std::function<bool(void* ctx)>;
+using OnRecvPipeCmd = std::function<void(void* ctx, const PipeCmd::Cmd& cmd)>;
+using OnCheckStop = std::function<bool(void* ctx)>;
+using OnStop = std::function<void(void* ctx)>;
 
 struct PipeCmdResult {
     PipeCmdResult() {
@@ -34,7 +35,7 @@ struct PipeCmdResult {
     }
 
     PipeCmdResult(
-        const PipeCmdCallback& resultCallback,
+        const OnRecvPipeCmd& resultCallback,
         void* ctx,
         HANDLE signalEvent
     ) {
@@ -44,7 +45,7 @@ struct PipeCmdResult {
     }
 
     PipeCmd::Cmd result;
-    PipeCmdCallback resultCallback;
+    OnRecvPipeCmd resultCallback;
     void* ctx;
     HANDLE signalEvent;
 };
@@ -67,20 +68,21 @@ public:
         const PipeCmd::Cmd& cmd,
         bool waitDone = true,
         DWORD waitTime = -1,
-        const PipeCmdCallback& sendCmdCallback = nullptr,
+        const OnRecvPipeCmd& sendCmdCallback = nullptr,
         void* ctx = nullptr
     );
 
     void RegisterCallback(
         void* ctx,
-        const PipeCmdCallback& recvCmdCallback,
-        const CheckStopCallback& checkStopCallback
+        const OnRecvPipeCmd& recvCmdCallback,
+        const OnCheckStop& checkStopCallback,
+        const OnStop& stopCallback
     );
 
     static bool ParsePipeCmd(
         PipeCmd::Cmd& cmd,
         const unsigned char* data,
-        size_t dataSize
+        std::uint32_t dataSize
     );
 
     static void AddExtraData(
