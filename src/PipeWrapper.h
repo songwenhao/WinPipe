@@ -1,5 +1,11 @@
 #pragma once
 
+#ifdef WinPipe_EXPORTS
+#define WinPipe_API __declspec(dllexport)
+#else
+#define WinPipe_API __declspec(dllimport)
+#endif
+
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
@@ -27,7 +33,7 @@ using OnRecvPipeCmd = std::function<void(void* ctx, const PipeCmd::Cmd& cmd)>;
 using OnCheckStop = std::function<bool(void* ctx)>;
 using OnStop = std::function<void(void* ctx)>;
 
-struct PipeCmdResult {
+struct WinPipe_API PipeCmdResult {
     PipeCmdResult() {
         this->resultCallback = nullptr;
         this->ctx = nullptr;
@@ -50,7 +56,7 @@ struct PipeCmdResult {
     HANDLE signalEvent;
 };
 
-class PipeWrapper {
+class WinPipe_API PipeWrapper {
 public:
     PipeWrapper(
         const std::wstring& pipeName,
@@ -74,9 +80,9 @@ public:
 
     void RegisterCallback(
         void* ctx,
-        const OnRecvPipeCmd& recvCmdCallback,
-        const OnCheckStop& checkStopCallback,
-        const OnStop& stopCallback
+        const OnRecvPipeCmd& onRecvPipeCmd,
+        const OnCheckStop& onCheckStop,
+        const OnStop& onStop
     );
 
     static bool ParsePipeCmd(

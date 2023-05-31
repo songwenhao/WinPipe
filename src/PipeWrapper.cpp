@@ -12,6 +12,8 @@ PipeWrapperImpl(
     : isPipeServer_(pipeType == PipeType::PipeServer),
     readPipeHandle_(INVALID_HANDLE_VALUE),
     writePipeHandle_(INVALID_HANDLE_VALUE),
+    s2c_heartbeatEventHandle_(nullptr),
+    c2s_heartbeatEventHandle_(nullptr),
     pipeName_(wstrPipeName),
     heartbeatEventName_(wstrHeartbeatEventName),
     heartbeatThd_(nullptr),
@@ -19,28 +21,29 @@ PipeWrapperImpl(
     pipeWriteThd_(nullptr),
     stopFlag_(false),
     ctx_(nullptr),
-    handleRecvCmdFunc_(nullptr),
-    checkStop_(nullptr)
+    onRecvPipeCmd_(nullptr),
+    onCheckStop_(nullptr),
+    onStop_(nullptr),
+    logBufMutex_(std::make_unique<std::mutex>()),
+    logBufA_(std::make_unique<char[]>(logBufSize_)),
+    logBufW_(std::make_unique<wchar_t[]>(logBufSize_)),
+    readPipeConnectedEvent_(CreateEventW(nullptr, FALSE, FALSE, nullptr)),
+    writePipeConnectedEvent_(CreateEventW(nullptr, FALSE, FALSE, nullptr)),
+    cmdSeq_(1),
+    pipeCmdResultMapMutex_(std::make_unique<std::mutex>()),
+    pid_(GetCurrentProcessId())
 {
-    logBufA_ = std::make_unique<char[]>(logBufSize_);
-    logBufW_ = std::make_unique<wchar_t[]>(logBufSize_);
-
-    pid_ = GetCurrentProcessId();
-
     logPrevStrA_ = (isPipeServer_ ? "[pipe server]" : "[pipe client]");
     logPrevStrW_ = (isPipeServer_ ? L"[pipe server]" : L"[pipe client]");
 
-    s2c_heartbeatEventHandle_ = CreateEventW(NULL, FALSE, FALSE, (heartbeatEventName_ + L"-s2c").c_str());
-    c2s_heartbeatEventHandle_ = CreateEventW(NULL, FALSE, FALSE, (heartbeatEventName_ + L"-c2s").c_str());
+    s2c_heartbeatEventHandle_ = CreateEventW(nullptr, FALSE, FALSE, (heartbeatEventName_ + L"-s2c").c_str());
+    c2s_heartbeatEventHandle_ = CreateEventW(nullptr, FALSE, FALSE, (heartbeatEventName_ + L"-c2s").c_str());
 
     memset(&pipeReadOverlapped_, 0, sizeof(pipeReadOverlapped_));
-    pipeReadOverlapped_.hEvent = CreateEventW(NULL, FALSE, FALSE, NULL);
+    pipeReadOverlapped_.hEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
 
     memset(&pipeWriteOverlapped_, 0, sizeof(pipeWriteOverlapped_));
-    pipeWriteOverlapped_.hEvent = CreateEventW(NULL, FALSE, FALSE, NULL);
-
-    readPipeConnectedEvent_ = CreateEventW(NULL, FALSE, FALSE, NULL);
-    writePipeConnectedEvent_ = CreateEventW(NULL, FALSE, FALSE, NULL);
+    pipeWriteOverlapped_.hEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
 }
 
 ~PipeWrapperImpl() {
@@ -108,7 +111,7 @@ static void PipeThd(
 
     do {
         memset(&overlapped, 0, sizeof(overlapped));
-        overlapped.hEvent = CreateEventW(NULL, FALSE, FALSE, NULL);
+        overlapped.hEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
         if (!overlapped.hEvent) {
             break;
         }
@@ -123,7 +126,7 @@ static void PipeThd(
                 obj->pipeBufSize_,
                 obj->pipeBufSize_,
                 0,
-                NULL);
+                nullptr);
 
             if (pipeHandle == INVALID_HANDLE_VALUE) {
                 errCode = GetLastError();
@@ -142,7 +145,7 @@ static void PipeThd(
                 while (true) {
                     waitCode = WaitForSingleObject(overlapped.hEvent, 1000);
                     if (waitCode == WAIT_TIMEOUT) {
-                        if (obj->stopFlag_ || (obj->checkStop_ && obj->checkStop_(obj->ctx_))) {
+                        if (obj->CheckStop()) {
                             obj->LogW(L"%s stop connect pipe!!!", logPrevStr.c_str());
                             break;
                         }
@@ -168,16 +171,20 @@ static void PipeThd(
             ULONGLONG beginTime = GetTickCount64();
 
             while (true) {
+                if (obj->CheckStop()) {
+                    break;
+                }
+
                 // Try to open a named pipe; wait for it, if necessary.
                 pipeHandle = CreateFileW(
                     pipeName.c_str(),
                     GENERIC_READ |
                     GENERIC_WRITE,
                     0,
-                    NULL,
+                    nullptr,
                     OPEN_EXISTING,
                     FILE_FLAG_OVERLAPPED,
-                    NULL);
+                    nullptr);
 
                 errCode = GetLastError();
 
@@ -186,6 +193,10 @@ static void PipeThd(
                 } else if (pipeHandle != INVALID_HANDLE_VALUE && errCode == ERROR_PIPE_BUSY) {
                     // All pipe instances are busy, so wait. 
                     while (true) {
+                        if (obj->CheckStop()) {
+                            break;
+                        }
+
                         if (WaitNamedPipeW(pipeName.c_str(), 1000)) {
                             isSuccess = true;
                             break;
@@ -200,7 +211,7 @@ static void PipeThd(
                 if (isSuccess) {
                     isSuccess = false;
 
-                    if (SetNamedPipeHandleState(pipeHandle, &pipeMode, NULL, NULL)) {
+                    if (SetNamedPipeHandleState(pipeHandle, &pipeMode, nullptr, nullptr)) {
                         isSuccess = true;
                     }
                 }
@@ -266,7 +277,7 @@ static void PipeThd(
         PipeCmd::Cmd cmd;
 
         while (true) {
-            if (obj->stopFlag_ || (obj->checkStop_ && obj->checkStop_(obj->ctx_))) {
+            if (obj->CheckStop()) {
                 break;
             }
 
@@ -275,8 +286,8 @@ static void PipeThd(
                 continue;
             }
 
-            if (obj->handleRecvCmdFunc_) {
-                obj->handleRecvCmdFunc_(obj->ctx_, cmd);
+            if (obj->onRecvPipeCmd_) {
+                obj->onRecvPipeCmd_(obj->ctx_, cmd);
             }
         }
     }
@@ -309,9 +320,8 @@ bool ConnectPipe(ULONGLONG maxWaitTime) {
         DWORD waitCode = -1;
         HANDLE eventHandles[2] = { readPipeConnectedEvent_, writePipeConnectedEvent_ };
 
-        while (!stopFlag_) {
-            if (checkStop_ && checkStop_(ctx_)) {
-                stopFlag_ = true;
+        while (true) {
+            if (CheckStop()) {
                 break;
             }
 
@@ -367,12 +377,12 @@ void DisConnectPipe() {
 
     if (s2c_heartbeatEventHandle_) {
         CloseHandle(s2c_heartbeatEventHandle_);
-        s2c_heartbeatEventHandle_ = NULL;
+        s2c_heartbeatEventHandle_ = nullptr;
     }
 
     if (c2s_heartbeatEventHandle_) {
         CloseHandle(c2s_heartbeatEventHandle_);
-        c2s_heartbeatEventHandle_ = NULL;
+        c2s_heartbeatEventHandle_ = nullptr;
     }
 
     if (readPipeHandle_ != INVALID_HANDLE_VALUE) {
@@ -397,22 +407,22 @@ void DisConnectPipe() {
 
     if (pipeReadOverlapped_.hEvent) {
         CloseHandle(pipeReadOverlapped_.hEvent);
-        pipeReadOverlapped_.hEvent = NULL;
+        pipeReadOverlapped_.hEvent = nullptr;
     }
 
     if (pipeWriteOverlapped_.hEvent) {
         CloseHandle(pipeWriteOverlapped_.hEvent);
-        pipeWriteOverlapped_.hEvent = NULL;
+        pipeWriteOverlapped_.hEvent = nullptr;
     }
 
     if (readPipeConnectedEvent_) {
         CloseHandle(readPipeConnectedEvent_);
-        readPipeConnectedEvent_ = NULL;
+        readPipeConnectedEvent_ = nullptr;
     }
 
     if (writePipeConnectedEvent_) {
         CloseHandle(writePipeConnectedEvent_);
-        writePipeConnectedEvent_ = NULL;
+        writePipeConnectedEvent_ = nullptr;
     }
 }
 
@@ -424,13 +434,7 @@ bool StartHeartbeatThd() {
         const int maxWaitTime = 5;
         DWORD waitCode = -1;
         while (true) {
-            if (stopFlag_) {
-                Quit();
-                break;
-            }
-
-            if (checkStop_ && checkStop_(ctx_)) {
-                Quit();
+            if (CheckStop()) {
                 break;
             }
 
@@ -525,7 +529,7 @@ bool PipeRead(
                             break;
                         }
 
-                        if (stopFlag_ || (checkStop_ && checkStop_(ctx_))) {
+                        if (CheckStop()) {
                             LogW(L"[%s] stopFlag is true!!!", funcName);
                             break;
                         }
@@ -600,7 +604,7 @@ bool PipeWrite(
                         }
                     }
 
-                    if (stopFlag_ || (checkStop_ && checkStop_(ctx_))) {
+                    if (CheckStop()) {
                         LogW(L"[%s] stopFlag is true!!!", funcName);
                         break;
                     }
@@ -665,7 +669,7 @@ bool RecvCmd(PipeCmd::Cmd& cmd) {
 
         {
             // 设置命令执行结果，取出命令注册的信息
-            std::lock_guard<std::mutex> locker(pipeCmdResultMapMutex_);
+            std::lock_guard<std::mutex> locker(*pipeCmdResultMapMutex_);
             auto iter = pipeCmdResultMap_.find(key);
             if (iter != pipeCmdResultMap_.end()) {
                 iter->second.result = cmd;
@@ -686,7 +690,7 @@ bool RecvCmd(PipeCmd::Cmd& cmd) {
             }
 
             // 异步命令无需保留执行结果
-            std::lock_guard<std::mutex> locker(pipeCmdResultMapMutex_);
+            std::lock_guard<std::mutex> locker(*pipeCmdResultMapMutex_);
             auto iter = pipeCmdResultMap_.find(key);
             if (iter != pipeCmdResultMap_.end()) {
                 pipeCmdResultMap_.erase(iter);
@@ -703,15 +707,15 @@ bool RecvCmd(PipeCmd::Cmd& cmd) {
 }
 
 void Quit() {
-    if (stopCallback_) {
-        stopCallback_(ctx_);
+    if (onStop_) {
+        onStop_(ctx_);
     }
 
     PipeCmd::Cmd cmd;
     cmd.set_action(-1);
 
-    if (handleRecvCmdFunc_) {
-        handleRecvCmdFunc_(ctx_, cmd);
+    if (onRecvPipeCmd_) {
+        onRecvPipeCmd_(ctx_, cmd);
     }
 }
 
@@ -726,7 +730,7 @@ PipeCmd::Cmd SendCmd(
 
     PipeCmd::Cmd resultCmd;
 
-    HANDLE signalEvent = NULL;
+    HANDLE signalEvent = nullptr;
 
     do {
         if (stopFlag_) {
@@ -743,12 +747,12 @@ PipeCmd::Cmd SendCmd(
 
         // 同步命令设置事件
         if (waitDone && copyCmd.action() > -1) {
-            signalEvent = CreateEventW(NULL, FALSE, FALSE, NULL);
+            signalEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
         }
 
         {
             // 注册命令
-            std::lock_guard<std::mutex> locker(pipeCmdResultMapMutex_);
+            std::lock_guard<std::mutex> locker(*pipeCmdResultMapMutex_);
             pipeCmdResultMap_.insert({ key, PipeCmdResult(sendCmdCallback, ctx, signalEvent) });
         }
 
@@ -776,7 +780,7 @@ PipeCmd::Cmd SendCmd(
             DWORD waitCode = -1;
 
             if (signalEvent) {
-                while (!stopFlag_ && waitTime > 0) {
+                while (!CheckStop() && waitTime > 0) {
                     waitCode = WaitForSingleObject(signalEvent, 1000);
                     if (waitCode != WAIT_TIMEOUT) {
                         break;
@@ -791,7 +795,7 @@ PipeCmd::Cmd SendCmd(
             }
 
             {
-                std::lock_guard<std::mutex> locker(pipeCmdResultMapMutex_);
+                std::lock_guard<std::mutex> locker(*pipeCmdResultMapMutex_);
                 auto iter = pipeCmdResultMap_.find(key);
                 if (iter != pipeCmdResultMap_.end()) {
                     resultCmd = iter->second.result;
@@ -803,7 +807,7 @@ PipeCmd::Cmd SendCmd(
 
     if (signalEvent) {
         CloseHandle(signalEvent);
-        signalEvent = NULL;
+        signalEvent = nullptr;
     }
 
     return resultCmd;
@@ -811,14 +815,39 @@ PipeCmd::Cmd SendCmd(
 
 void RegisterCallback(
     void* ctx,
-    const OnRecvPipeCmd& recvCmdCallback,
-    const OnCheckStop& checkStopCallback,
-    const OnStop& stopCallback
+    const OnRecvPipeCmd& onRecvPipeCmd,
+    const OnCheckStop& onCheckStop,
+    const OnStop& onStop
 ) {
     ctx_ = ctx;
-    handleRecvCmdFunc_ = recvCmdCallback;
-    checkStop_ = checkStopCallback;
-    stopCallback_ = stopCallback;
+    onRecvPipeCmd_ = onRecvPipeCmd;
+    onCheckStop_ = onCheckStop;
+    onStop_ = onStop;
+}
+
+bool CheckStop() {
+    bool stop = false;
+
+    do {
+        if (stopFlag_) {
+            stop = true;
+            break;
+        }
+
+        if (onCheckStop_ && onCheckStop_(this)) {
+            stopFlag_ = true;
+            break;
+        }
+
+    } while (false);
+
+    if (stop) {
+        if (onStop_) {
+            onStop_(this);
+        }
+    }
+
+    return stop;
 }
 
 void LogA(const char* format, ...) {
@@ -826,7 +855,7 @@ void LogA(const char* format, ...) {
     return;
 #endif
 
-    std::lock_guard<std::mutex> locker(logBufMutex_);
+    std::lock_guard<std::mutex> locker(*logBufMutex_);
 
     va_list args;
     va_start(args, format);
@@ -865,7 +894,7 @@ void LogW(const wchar_t* format, ...) {
     return;
 #endif
     
-    std::lock_guard<std::mutex> locker(logBufMutex_);
+    std::lock_guard<std::mutex> locker(*logBufMutex_);
 
     va_list args;
     va_start(args, format);
@@ -913,15 +942,15 @@ private:
     bool stopFlag_;
 
     void* ctx_;
-    OnRecvPipeCmd handleRecvCmdFunc_;
-    OnCheckStop checkStop_;
-    OnStop stopCallback_;
+    OnRecvPipeCmd onRecvPipeCmd_;
+    OnCheckStop onCheckStop_;
+    OnStop onStop_;
 
     OVERLAPPED pipeReadOverlapped_;
     OVERLAPPED pipeWriteOverlapped_;
     const std::uint32_t pipeBufSize_ = 4096;
 
-    std::mutex logBufMutex_;
+    std::unique_ptr<std::mutex> logBufMutex_;
     std::string logPrevStrA_;
     std::wstring logPrevStrW_;
     std::unique_ptr<char[]> logBufA_;
@@ -931,11 +960,11 @@ private:
     HANDLE readPipeConnectedEvent_;
     HANDLE writePipeConnectedEvent_;
 
-    std::int64_t cmdSeq_ = 1;
-    std::mutex pipeCmdResultMapMutex_;
+    std::int64_t cmdSeq_;
+    std::unique_ptr<std::mutex> pipeCmdResultMapMutex_;
     std::map<std::string, PipeCmdResult> pipeCmdResultMap_;
 
-    DWORD pid_ = 0;
+    DWORD pid_;
 };
 
 PipeWrapper::PipeWrapper(
@@ -1127,13 +1156,13 @@ std::string PipeWrapper::Utf16ToUtf8(const std::wstring& str) {
     std::string dst;
 
     do {
-        int utf8Size = WideCharToMultiByte(CP_UTF8, 0, str.c_str(), -1, NULL, 0, NULL, NULL);
+        int utf8Size = WideCharToMultiByte(CP_UTF8, 0, str.c_str(), -1, nullptr, 0, nullptr, nullptr);
         if (utf8Size == 0) {
             break;
         }
 
         std::vector<char> resultVec(utf8Size);
-        int retSize = WideCharToMultiByte(CP_UTF8, 0, str.c_str(), -1, &resultVec[0], utf8Size, NULL, NULL);
+        int retSize = WideCharToMultiByte(CP_UTF8, 0, str.c_str(), -1, &resultVec[0], utf8Size, nullptr, nullptr);
         if (retSize != utf8Size) {
             break;
         }
@@ -1149,7 +1178,7 @@ std::wstring PipeWrapper::Utf8ToUtf16(const std::string& str) {
     std::wstring dst;
 
     do {
-        int wideSize = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, NULL, 0);
+        int wideSize = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, nullptr, 0);
         if (ERROR_NO_UNICODE_TRANSLATION == wideSize || wideSize == 0) {
             break;
         }
