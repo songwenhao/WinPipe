@@ -834,7 +834,7 @@ bool CheckStop() {
             break;
         }
 
-        if (onCheckStop_ && onCheckStop_(this)) {
+        if (onCheckStop_ && onCheckStop_(ctx_)) {
             stopFlag_ = true;
             break;
         }
@@ -843,7 +843,7 @@ bool CheckStop() {
 
     if (stop) {
         if (onStop_) {
-            onStop_(this);
+            onStop_(ctx_);
         }
     }
 
