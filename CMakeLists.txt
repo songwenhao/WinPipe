@@ -90,17 +90,36 @@ target_include_directories(
 
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
 	message(STATUS "Target is 64 bits")
-    target_link_directories(
-		${PROJECT_NAME}
-		PRIVATE
-		${CMAKE_CURRENT_SOURCE_DIR}/protobuf/libs/x64
-	)
+	
+	if(BUILD_SHARED_LIBS)
+		target_link_directories(
+			${PROJECT_NAME}
+			PRIVATE
+			${CMAKE_CURRENT_SOURCE_DIR}/protobuf/libs/x64
+		)
+	else()
+		target_link_directories(
+			${PROJECT_NAME}
+			PRIVATE
+			${CMAKE_CURRENT_SOURCE_DIR}/protobuf/libs/StaticRuntime/x64
+		)
+	endif()
     
 else()
 	message(STATUS "Target is 32 bits")
-    target_link_directories(
-		${PROJECT_NAME}
-		PRIVATE
-		${CMAKE_CURRENT_SOURCE_DIR}/protobuf/libs/Win32
-	)
+	
+	if(BUILD_SHARED_LIBS)
+		target_link_directories(
+			${PROJECT_NAME}
+			PRIVATE
+			${CMAKE_CURRENT_SOURCE_DIR}/protobuf/libs/Win32
+		)
+	else()
+		target_link_directories(
+			${PROJECT_NAME}
+			PRIVATE
+			${CMAKE_CURRENT_SOURCE_DIR}/protobuf/libs/StaticRuntime/Win32
+		)
+	endif()
+	
 endif()
