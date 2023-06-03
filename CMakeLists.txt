@@ -66,7 +66,7 @@ else()
 	set(LIBRARY_TYPE STATIC)
 	
 	if(MSVC)
-		add_definitions(-DUNICODE -D_UNICODE)
+		add_definitions(-DUNICODE -D_UNICODE -DWinPipe_STATIC)
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4251")
 	endif()
 endif()

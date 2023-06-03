@@ -1,9 +1,13 @@
 #pragma once
 
+#ifdef WinPipe_STATIC
+    #define WinPipe_API
+#else
 #ifdef WinPipe_EXPORTS
 #define WinPipe_API __declspec(dllexport)
 #else
 #define WinPipe_API __declspec(dllimport)
+    #endif
 #endif
 
 #ifndef WIN32_LEAN_AND_MEAN
