@@ -52,18 +52,23 @@ else()
 	endif()
 endif()
 
-if(MSVC)
-	add_definitions(-DUNICODE -D_UNICODE)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4251")
-endif()
-
 set(PROJECT_NAME "WinPipe")
 
 project(${PROJECT_NAME} CXX)
 
 set(LIBRARY_TYPE SHARED)
-if(NOT BUILD_SHARED_LIBS)
+if(BUILD_SHARED_LIBS)
+	if(MSVC)
+		add_definitions(-DUNICODE -D_UNICODE -DWinPipe_EXPORTS)
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4251")
+	endif()
+else()
 	set(LIBRARY_TYPE STATIC)
+	
+	if(MSVC)
+		add_definitions(-DUNICODE -D_UNICODE)
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4251")
+	endif()
 endif()
 
 message(STATUS "LIBRARY_TYPE=${LIBRARY_TYPE}")
