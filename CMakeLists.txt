@@ -7,6 +7,7 @@ endif()
 
 message(STATUS "CMAKE_VERSION=${CMAKE_VERSION}")
 
+option(BUILD_SHARED_LIBS "Build shared libs" ON)
 option(MSVC_STATIC_RUNTIME "Build static runtime" OFF)
 
 # The CMAKE_<LANG>_FLAGS(_<BUILD_TYPE>)? is meant to be user controlled.
@@ -60,9 +61,16 @@ set(PROJECT_NAME "WinPipe")
 
 project(${PROJECT_NAME} CXX)
 
+set(LIBRARY_TYPE SHARED)
+if(NOT BUILD_SHARED_LIBS)
+	set(LIBRARY_TYPE STATIC)
+endif()
+
+message(STATUS "LIBRARY_TYPE=${LIBRARY_TYPE}")
+
 add_library(
 	${PROJECT_NAME}
-	SHARED
+	${LIBRARY_TYPE}
 	src/pipeCmd.pb.cc
 	src/pipeCmd.pb.h
 	src/PipeWrapper.cpp
