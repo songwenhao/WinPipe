@@ -4,6 +4,7 @@
 #ifndef GOOGLE_PROTOBUF_INCLUDED_pipeCmd_2eproto
 #define GOOGLE_PROTOBUF_INCLUDED_pipeCmd_2eproto
 
+#include "option.h"
 #include <limits>
 #include <string>
 
@@ -92,7 +93,7 @@ inline bool ExtraType_Parse(
 }
 // ===================================================================
 
-class Extra final :
+class WinPipe_API Extra final :
     public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:PipeCmd.Extra) */ {
  public:
   inline Extra() : Extra(nullptr) {}
@@ -294,7 +295,7 @@ class Extra final :
 };
 // -------------------------------------------------------------------
 
-class Cookie final :
+class WinPipe_API Cookie final :
     public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:PipeCmd.Cookie) */ {
  public:
   inline Cookie() : Cookie(nullptr) {}
@@ -495,7 +496,7 @@ class Cookie final :
 };
 // -------------------------------------------------------------------
 
-class Cmd final :
+class WinPipe_API Cmd final :
     public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:PipeCmd.Cmd) */ {
  public:
   inline Cmd() : Cmd(nullptr) {}
