@@ -27,15 +27,25 @@ public:
         onRecvPipeCmd_(nullptr),
         onCheckStop_(nullptr),
         onStop_(nullptr),
-        logBufMutex_(std::make_unique<std::mutex>()),
-        logBufA_(std::make_unique<char[]>(logBufSize_)),
-        logBufW_(std::make_unique<wchar_t[]>(logBufSize_)),
-        readPipeConnectedEvent_(CreateEventW(nullptr, FALSE, FALSE, nullptr)),
-        writePipeConnectedEvent_(CreateEventW(nullptr, FALSE, FALSE, nullptr)),
-        pipeCmdResultMapMutex_(std::make_unique<std::mutex>()),
-        pid_(GetCurrentProcessId()) {
+        logBufMutex_(nullptr),
+        logBufA_(nullptr),
+        logBufW_(nullptr),
+        readPipeConnectedEvent_(nullptr),
+        writePipeConnectedEvent_(nullptr),
+        pipeCmdResultMapMutex_(nullptr),
+        pid_(0) {
+        logBufMutex_ = std::make_unique<std::mutex>();
+        logBufA_ = std::make_unique<char[]>(logBufSize_);
+        logBufW_ = std::make_unique<wchar_t[]>(logBufSize_);
         logPrevStrA_ = (isPipeServer_ ? "[pipe server]" : "[pipe client]");
         logPrevStrW_ = (isPipeServer_ ? L"[pipe server]" : L"[pipe client]");
+
+        readPipeConnectedEvent_ = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+        writePipeConnectedEvent_ = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+        
+        pipeCmdResultMapMutex_ = std::make_unique<std::mutex>();
+        
+        pid_ = GetCurrentProcessId();
 
         s2c_heartbeatEventHandle_ = CreateEventW(nullptr, FALSE, FALSE, (heartbeatEventName_ + L"-s2c").c_str());
         c2s_heartbeatEventHandle_ = CreateEventW(nullptr, FALSE, FALSE, (heartbeatEventName_ + L"-c2s").c_str());
