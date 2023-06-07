@@ -40,9 +40,13 @@ cd %ROOT_PATH%
 call rmdir /s /q build
 call mkdir build
 call cmake -S . -B build -A Win32
+cd build
+call cmake --build . --config Debug
+call cmake --build . --config RelWithDebInfo
 call xcopy %ROOT_PATH%\protobuf\libs\Win32\*.dll build\Debug\ /y
 call xcopy %ROOT_PATH%\protobuf\libs\Win32\*.dll build\RelWithDebInfo\ /y
-cd ..
+
+cd %ROOT_PATH%
 call rmdir /s /q build-StaticRuntime
 call mkdir build-StaticRuntime
 call cmake -S . -B build-StaticRuntime -A Win32 -DMSVC_STATIC_RUNTIME=ON -DBUILD_SHARED_LIBS=OFF
