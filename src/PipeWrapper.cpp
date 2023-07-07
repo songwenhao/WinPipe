@@ -946,7 +946,7 @@ public:
         if (SUCCEEDED(::CoCreateGuid(&guid))) {
             _snprintf_s(buf, _countof(buf), _TRUNCATE,
                 "%s-{%08X-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X}",
-                (isPipeServer_ ? "[pipe client]" : "[pipe server]"),
+                (isPipeServer_ ? "[pipe server]" : "[pipe client]"),
                 guid.Data1,
                 guid.Data2,
                 guid.Data3,
@@ -960,7 +960,7 @@ public:
         if (uniqueId.empty()) {
             auto duration_since_epoch = std::chrono::system_clock::now().time_since_epoch();
             auto microseconds_since_epoch = std::chrono::duration_cast<std::chrono::microseconds>(duration_since_epoch).count();
-            uniqueId = std::string((isPipeServer_ ? "[pipe client]-" : "[pipe server]-")) + std::to_string(microseconds_since_epoch);
+            uniqueId = std::string((isPipeServer_ ? "[pipe server]-" : "[pipe client]-")) + std::to_string(microseconds_since_epoch);
         }
 
         if (SUCCEEDED(ret)) {
