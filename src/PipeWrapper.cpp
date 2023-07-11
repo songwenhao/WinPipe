@@ -304,7 +304,10 @@ public:
         }
     }
 
-    bool ConnectPipe(ULONGLONG maxWaitTime) {
+    bool ConnectPipe(
+        std::function<bool()> checkStop,
+        ULONGLONG maxWaitTime
+    ) {
         bool connected = false;
 
         do {
@@ -332,7 +335,7 @@ public:
             HANDLE eventHandles[2] = { readPipeConnectedEvent_, writePipeConnectedEvent_ };
 
             while (true) {
-                if (CheckStop()) {
+                if (checkStop && checkStop()) {
                     break;
                 }
 
@@ -733,7 +736,7 @@ public:
         const PipeCmd::Cmd& cmd,
         bool waitDone,
         DWORD waitTime,
-        const OnRecvPipeCmd& sendCmdCallback,
+        OnRecvPipeCmd sendCmdCallback,
         void* ctx
     ) {
         const char* funcName = __FUNCTION__;
@@ -823,9 +826,9 @@ public:
 
     void RegisterCallback(
         void* ctx,
-        const OnRecvPipeCmd& onRecvPipeCmd,
-        const OnCheckStop& onCheckStop,
-        const OnStop& onStop
+        OnRecvPipeCmd onRecvPipeCmd,
+        OnCheckStop onCheckStop,
+        OnStop onStop
     ) {
         ctx_ = ctx;
         onRecvPipeCmd_ = onRecvPipeCmd;
@@ -1020,8 +1023,11 @@ PipeWrapper::~PipeWrapper() {
     }
 }
 
-bool PipeWrapper::ConnectPipe(ULONGLONG maxWaitTime) {
-    return pimpl_->ConnectPipe(maxWaitTime);
+bool PipeWrapper::ConnectPipe(
+    std::function<bool()> checkStop,
+    ULONGLONG maxWaitTime
+) {
+    return pimpl_->ConnectPipe(checkStop, maxWaitTime);
 }
 
 void PipeWrapper::DisConnectPipe() {
@@ -1032,7 +1038,7 @@ PipeCmd::Cmd PipeWrapper::SendCmd(
     const PipeCmd::Cmd& cmd,
     bool waitDone,
     DWORD waitTime,
-    const OnRecvPipeCmd& sendCmdCallback,
+    OnRecvPipeCmd sendCmdCallback,
     void* ctx
 ) {
     return pimpl_->SendCmd(cmd, waitDone, waitTime, sendCmdCallback, ctx);
@@ -1040,9 +1046,9 @@ PipeCmd::Cmd PipeWrapper::SendCmd(
 
 void PipeWrapper::RegisterCallback(
     void* ctx,
-    const OnRecvPipeCmd& recvCmdCallback,
-    const OnCheckStop& checkStopCallback,
-    const OnStop& stopCallback
+    OnRecvPipeCmd recvCmdCallback,
+    OnCheckStop checkStopCallback,
+    OnStop stopCallback
 ) {
     pimpl_->RegisterCallback(ctx, recvCmdCallback, checkStopCallback, stopCallback);
 }
