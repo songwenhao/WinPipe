@@ -349,5 +349,7 @@ MigrationBackup/
 
 !tools
 tools/*
+!tools/cmake
+!tools/cmake_options
 !tools/7z.exe
 !tools/wget.exe
