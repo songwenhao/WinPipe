@@ -15,8 +15,5 @@ git submodule update --init protobuf
 
 **Change path to current path.**
 
-## Prepare for build
-First run **prepare-build.cmd** to get build tools, then run **build-x86.cmd** or **build-x64.cmd**.
-
 ## Build ##
-Use cmake to build.
+run **build-x86.cmd** or **build-x64.cmd**.
