@@ -159,7 +159,7 @@ public:
                         waitCode = WaitForSingleObject(overlapped.hEvent, 1000);
                         if (waitCode == WAIT_TIMEOUT) {
                             if (obj->CheckStop()) {
-                                obj->LogW(L"%s stop connect pipe!!!", logPrevStr.c_str());
+                                obj->LogW(L"%s stop!!!", logPrevStr.c_str());
                                 break;
                             }
 
@@ -361,7 +361,7 @@ public:
     }
 
     void DisConnectPipe() {
-        stopFlag_ = true;
+        SetStop();
 
         if (heartbeatThd_) {
             if (heartbeatThd_->joinable()) {
@@ -469,7 +469,7 @@ public:
                             ++waitTime;
                             if (waitTime >= maxWaitTime) {
                                 LogW(L" wait for heartbeat event timeout %d seconds, exit ...", waitTime);
-                                stopFlag_ = true;
+                                SetStop();
                                 break;
                             }
 #endif
@@ -487,7 +487,7 @@ public:
                             ++waitTime;
                             if (waitTime >= maxWaitTime) {
                                 LogW(L" wait for heartbeat event timeout %d seconds, exit ...", waitTime);
-                                stopFlag_ = true;
+                                SetStop();
                                 break;
                             }
 #endif
@@ -579,7 +579,7 @@ public:
             }
 
             dataSize = 0;
-            stopFlag_ = true;
+            SetStop();
             LogW(L"[%s] Pipe read failed, stop!", funcName);
         }
 
@@ -640,7 +640,7 @@ public:
         } while (false);
 
         if (!isSuccess) {
-            stopFlag_ = true;
+            SetStop();
             LogW(L"[%s] Pipe write failed, stop!", funcName);
         }
 
@@ -740,7 +740,7 @@ public:
         HANDLE signalEvent = nullptr;
 
         do {
-            if (stopFlag_) {
+            if (CheckStop()) {
                 break;
             }
 
@@ -839,19 +839,23 @@ public:
             }
 
             if (onCheckStop_ && onCheckStop_(ctx_)) {
-                stopFlag_ = true;
+                stop = true;
+                SetStop();
                 break;
             }
 
         } while (false);
 
-        if (stop) {
+        return stop;
+    }
+    void SetStop() {
+        if (!stopFlag_) {
+            stopFlag_ = true;
             if (onStop_) {
                 onStop_(ctx_);
             }
         }
 
-        return stop;
     }
 
     void LogA(const char* format, ...) {
