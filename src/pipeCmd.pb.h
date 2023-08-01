@@ -4,6 +4,7 @@
 #ifndef GOOGLE_PROTOBUF_INCLUDED_pipeCmd_2eproto
 #define GOOGLE_PROTOBUF_INCLUDED_pipeCmd_2eproto
 
+#include "option.h"
 #include <limits>
 #include <string>
 
