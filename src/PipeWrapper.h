@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "option.h"
 
@@ -7,17 +7,16 @@
 #endif
 #include <Windows.h>
 #include <string>
-#include <map>
-#include <thread>
 #include <functional>
-#include <mutex>
 
-#include "pipeCmd.pb.h"
+#ifndef NO_PROTOBUF
+    #include "pipeCmd.pb.h"
 
-#ifdef _DEBUG
-#pragma comment(lib, "libprotobufd")
-#else
-#pragma comment(lib, "libprotobuf")
+    #ifdef _DEBUG
+    #pragma comment(lib, "libprotobufd")
+    #else
+    #pragma comment(lib, "libprotobuf")
+    #endif
 #endif
 
 enum class PipeType {
@@ -25,32 +24,12 @@ enum class PipeType {
     PipeClient
 };
 
-using OnRecvPipeCmd = std::function<void(void* ctx, const PipeCmd::Cmd& cmd)>;
 using OnCheckStop = std::function<bool(void* ctx)>;
 using OnStop = std::function<void(void* ctx)>;
 
-struct WinPipe_API PipeCmdResult {
-    PipeCmdResult() {
-        this->resultCallback = nullptr;
-        this->ctx = nullptr;
-        this->signalEvent = nullptr;
-    }
-
-    PipeCmdResult(
-        OnRecvPipeCmd resultCallback,
-        void* ctx,
-        HANDLE signalEvent
-    ) {
-        this->resultCallback = resultCallback;
-        this->ctx = ctx;
-        this->signalEvent = signalEvent;
-    }
-
-    PipeCmd::Cmd result;
-    OnRecvPipeCmd resultCallback;
-    void* ctx;
-    HANDLE signalEvent;
-};
+#ifndef NO_PROTOBUF
+using OnRecvPipeCmd = std::function<void(void* ctx, const PipeCmd::Cmd& cmd)>;
+#endif
 
 class WinPipe_API PipeWrapper {
 public:
@@ -62,12 +41,44 @@ public:
 
     ~PipeWrapper();
 
+    PipeWrapper(const PipeWrapper& rhs) = delete;
+    PipeWrapper(PipeWrapper&& rhs) = delete;
+    PipeWrapper& operator=(const PipeWrapper& rhs) = delete;
+    PipeWrapper& operator=(PipeWrapper&& rhs) = delete;
+
     bool ConnectPipe(
         std::function<bool()> checkStop = nullptr,
         ULONGLONG maxWaitTime = 30000
     );
 
     void DisConnectPipe();
+
+#ifdef NO_PROTOBUF
+
+    std::uint32_t Recv(
+        char* data,
+        std::uint32_t dataSize
+    );
+
+    std::uint32_t Send(
+        const char* data,
+        std::uint32_t dataSize
+    );
+
+    void RegisterCallback(
+        void* ctx,
+        OnCheckStop onCheckStop = nullptr,
+        OnStop onStop = nullptr
+    );
+
+#else
+
+    void RegisterCallback(
+        void* ctx,
+        OnRecvPipeCmd onRecvPipeCmd = nullptr,
+        OnCheckStop onCheckStop = nullptr,
+        OnStop onStop = nullptr
+    );
 
     PipeCmd::Cmd SendCmd(
         const PipeCmd::Cmd& cmd,
@@ -77,16 +88,9 @@ public:
         void* ctx = nullptr
     );
 
-    void RegisterCallback(
-        void* ctx,
-        OnRecvPipeCmd onRecvPipeCmd = nullptr,
-        OnCheckStop onCheckStop = nullptr,
-        OnStop onStop = nullptr
-    );
-
     static bool ParsePipeCmd(
         PipeCmd::Cmd& cmd,
-        const unsigned char* data,
+        const char* data,
         std::uint32_t dataSize
     );
 
@@ -146,11 +150,10 @@ public:
         const std::string& key
     );
 
+#endif
+
     static std::string GenerateUniqueId(bool isPipeServer);
 
-    static std::string Utf16ToUtf8(const std::wstring& str);
-
-    static std::wstring Utf8ToUtf16(const std::string& str);
 private:
     class PipeWrapperImpl;
     PipeWrapperImpl* pimpl_;

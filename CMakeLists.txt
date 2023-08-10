@@ -9,6 +9,7 @@ message(STATUS "CMAKE_VERSION=${CMAKE_VERSION}")
 
 option(BUILD_SHARED_LIBS "Build shared libs" ON)
 option(MSVC_STATIC_RUNTIME "Build static runtime" OFF)
+option(NO_PROTOBUF "Use google protobuf" OFF)
 
 # The CMAKE_<LANG>_FLAGS(_<BUILD_TYPE>)? is meant to be user controlled.
 # Prior to CMake 3.15, the MSVC runtime library was pushed into the same flags
@@ -57,69 +58,84 @@ set(PROJECT_NAME "WinPipe")
 project(${PROJECT_NAME} CXX)
 
 set(LIBRARY_TYPE SHARED)
-if(BUILD_SHARED_LIBS)
-	if(MSVC)
-		add_definitions(-DUNICODE -D_UNICODE -DWinPipe_EXPORTS -DPROTOBUF_USE_DLLS)
-		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4251")
-	endif()
+
+set(DEFINITIONS "-DUNICODE -D_UNICODE")
+
+if(BUILD_SHARED_LIBS)    
+    set(DEFINITIONS ${DEFINITIONS} -DWinPipe_EXPORTS)
+    
+    if(NO_PROTOBUF)
+        set(DEFINITIONS ${DEFINITIONS} -DNO_PROTOBUF)
+    else()
+        set(DEFINITIONS ${DEFINITIONS} -DPROTOBUF_USE_DLLS)
+    endif()  
 else()
-	set(LIBRARY_TYPE STATIC)
-	
-	if(MSVC)
-		add_definitions(-DUNICODE -D_UNICODE -DWinPipe_STATIC)
-		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4251")
-	endif()
+    set(LIBRARY_TYPE STATIC)
+    
+    set(DEFINITIONS ${DEFINITIONS} -DWinPipe_STATIC)
+    
+    if(NO_PROTOBUF)
+        set(DEFINITIONS ${DEFINITIONS} -DNO_PROTOBUF)
+    endif()  
 endif()
 
-message(STATUS "LIBRARY_TYPE=${LIBRARY_TYPE}")
+if(MSVC)
+    add_definitions(${DEFINITIONS})
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4251")
+endif()
+
+set(SOURCE_FILES
+    src/PipeWrapper.cpp
+    src/PipeWrapper.h
+)
+
+if(NOT NO_PROTOBUF)
+    message(STATUS "Build use protobuf")
+    list(APPEND SOURCE_FILES
+        src/pipeCmd.pb.cc
+        src/pipeCmd.pb.h
+    )
+endif()
+
+message(STATUS ${SOURCE_FILES})
 
 add_library(
 	${PROJECT_NAME}
 	${LIBRARY_TYPE}
-	src/pipeCmd.pb.cc
-	src/pipeCmd.pb.h
-	src/PipeWrapper.cpp
-	src/PipeWrapper.h
+	${SOURCE_FILES}
 )
 
-target_include_directories(
-	${PROJECT_NAME}
-    PRIVATE
-	${CMAKE_CURRENT_SOURCE_DIR}/protobuf/libs/includes
-)
-
-if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-	message(STATUS "Target is 64 bits")
-	
-	if(BUILD_SHARED_LIBS)
-		target_link_directories(
-			${PROJECT_NAME}
-			PRIVATE
-			${CMAKE_CURRENT_SOURCE_DIR}/protobuf/libs/x64
-		)
-	else()
-		target_link_directories(
-			${PROJECT_NAME}
-			PRIVATE
-			${CMAKE_CURRENT_SOURCE_DIR}/protobuf/libs/StaticRuntime/x64
-		)
-	endif()
+if(NOT NO_PROTOBUF)
+    set(PROTOBUF_LIB_PATH "")
     
-else()
-	message(STATUS "Target is 32 bits")
-	
-	if(BUILD_SHARED_LIBS)
-		target_link_directories(
-			${PROJECT_NAME}
-			PRIVATE
-			${CMAKE_CURRENT_SOURCE_DIR}/protobuf/libs/Win32
-		)
-	else()
-		target_link_directories(
-			${PROJECT_NAME}
-			PRIVATE
-			${CMAKE_CURRENT_SOURCE_DIR}/protobuf/libs/StaticRuntime/Win32
-		)
-	endif()
-	
+    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+        message(STATUS "Target is 64 bits")
+        
+        if(BUILD_SHARED_LIBS)
+            set(PROTOBUF_LIB_PATH ${CMAKE_CURRENT_SOURCE_DIR}/protobuf/libs/x64)
+        else()
+            set(PROTOBUF_LIB_PATH ${CMAKE_CURRENT_SOURCE_DIR}/protobuf/libs/StaticRuntime/x64)
+        endif()
+        
+    else()
+        message(STATUS "Target is 32 bits")
+        
+        if(BUILD_SHARED_LIBS)
+            set(PROTOBUF_LIB_PATH ${CMAKE_CURRENT_SOURCE_DIR}/protobuf/libs/Win32)
+        else()
+            set(PROTOBUF_LIB_PATH ${CMAKE_CURRENT_SOURCE_DIR}/protobuf/libs/StaticRuntime/Win32)
+        endif()
+    endif()
+    
+    target_include_directories(
+        ${PROJECT_NAME}
+        PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/protobuf/libs/includes
+    )
+    
+    target_link_directories(
+        ${PROJECT_NAME}
+        PRIVATE
+        ${PROTOBUF_LIB_PATH}
+    )
 endif()
