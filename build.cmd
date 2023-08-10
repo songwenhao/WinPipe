@@ -76,3 +76,11 @@ call cmake -S . -B %BUILD_PATH_NAME%-NoProtobuf -A %PLATFORM% -G %BUILD_SYSTEM% 
 cd %BUILD_PATH_NAME%-NoProtobuf
 call cmake --build . --config Debug
 call cmake --build . --config RelWithDebInfo
+
+cd %ROOT_PATH%
+call rmdir /s /q %BUILD_PATH_NAME%-NoProtobuf-StaticRuntime
+call mkdir %BUILD_PATH_NAME%-NoProtobuf-StaticRuntime
+call cmake -S . -B %BUILD_PATH_NAME%-NoProtobuf-StaticRuntime -A %PLATFORM% -G %BUILD_SYSTEM% -T %TOOLSET% -DCMAKE_SYSTEM_VERSION=%SDK_VERSION% -DMSVC_STATIC_RUNTIME=ON -DBUILD_SHARED_LIBS=OFF -DNO_PROTOBUF=ON
+cd %BUILD_PATH_NAME%-NoProtobuf-StaticRuntime
+call cmake --build . --config Debug
+call cmake --build . --config RelWithDebInfo
