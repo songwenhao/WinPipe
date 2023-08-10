@@ -3,8 +3,6 @@
 ## Clone codes
 git clone https://github.com/songwenhao/WinPipe.git
 
-git submodule update --init protobuf
-
 ## Open Visual Studio Command Prompt
 ### see. https://learn.microsoft.com/en-us/cpp/build/building-on-the-command-line?view=msvc-170
 **Developer command prompt shortcuts**
