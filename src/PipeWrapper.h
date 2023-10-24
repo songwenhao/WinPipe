@@ -1,6 +1,14 @@
 ﻿#pragma once
 
-#include "option.h"
+#ifdef WinPipe_STATIC
+    #define WinPipe_API
+#else
+    #ifdef WinPipe_EXPORTS
+        #define WinPipe_API __declspec(dllexport)
+    #else
+        #define WinPipe_API __declspec(dllimport)
+    #endif
+#endif
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -8,16 +16,7 @@
 #include <Windows.h>
 #include <string>
 #include <functional>
-
-#ifndef NO_PROTOBUF
-    #include "pipeCmd.pb.h"
-
-    #ifdef _DEBUG
-    #pragma comment(lib, "libprotobufd")
-    #else
-    #pragma comment(lib, "libprotobuf")
-    #endif
-#endif
+#include "PipeCmd.h"
 
 enum class PipeType {
     PipeServer = 0,
@@ -26,10 +25,7 @@ enum class PipeType {
 
 using OnCheckStop = std::function<bool(void* ctx)>;
 using OnStop = std::function<void(void* ctx)>;
-
-#ifndef NO_PROTOBUF
 using OnRecvPipeCmd = std::function<void(void* ctx, const PipeCmd::Cmd& cmd)>;
-#endif
 
 class WinPipe_API PipeWrapper {
 public:
@@ -53,26 +49,6 @@ public:
 
     void DisConnectPipe();
 
-#ifdef NO_PROTOBUF
-
-    std::uint32_t Recv(
-        char* data,
-        std::uint32_t dataSize
-    );
-
-    std::uint32_t Send(
-        const char* data,
-        std::uint32_t dataSize
-    );
-
-    void RegisterCallback(
-        void* ctx,
-        OnCheckStop onCheckStop = nullptr,
-        OnStop onStop = nullptr
-    );
-
-#else
-
     void RegisterCallback(
         void* ctx,
         OnRecvPipeCmd onRecvPipeCmd = nullptr,
@@ -87,72 +63,6 @@ public:
         OnRecvPipeCmd sendCmdCallback = nullptr,
         void* ctx = nullptr
     );
-
-    static bool ParsePipeCmd(
-        PipeCmd::Cmd& cmd,
-        const char* data,
-        std::uint32_t dataSize
-    );
-
-    static void AddExtraData(
-        PipeCmd::Cmd& cmd,
-        const std::string& key,
-        const std::string& value
-    );
-
-    static void AddExtraData(
-        PipeCmd::Cmd& cmd,
-        const std::string& key,
-        int value
-    );
-
-    static void AddExtraData(
-        PipeCmd::Cmd& cmd,
-        const std::string& key,
-        unsigned int value
-    );
-
-    static void AddExtraData(
-        PipeCmd::Cmd& cmd,
-        const std::string& key,
-        long long value
-    );
-
-    static void AddExtraData(
-        PipeCmd::Cmd& cmd,
-        const std::string& key,
-        unsigned long long value
-    );
-
-    static void AddExtraData(
-        PipeCmd::Cmd& cmd,
-        const std::string& key,
-        double value
-    );
-
-    static std::string GetStringExtraData(
-        const PipeCmd::Cmd& cmd,
-        const std::string& key
-    );
-
-    static long long GetNumExtraData(
-        const PipeCmd::Cmd& cmd,
-        const std::string& key
-    );
-
-    static double GetRealExtraData(
-        const PipeCmd::Cmd& cmd,
-        const std::string& key
-    );
-
-    static bool GetBooleanExtraData(
-        const PipeCmd::Cmd& cmd,
-        const std::string& key
-    );
-
-#endif
-
-    static std::string GenerateUniqueId(bool isPipeServer);
 
 private:
     class PipeWrapperImpl;

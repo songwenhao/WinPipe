@@ -4,11 +4,14 @@
 #include "pch.h"
 #include "../CefPipeCmd.h"
 
+PipeCmd::Cmd SendPipeCmd(PipeWrapper& pipeWrapper, const PipeCmd::Cmd& cmd, bool waitDone) {
+    printf("[PipeClient] ==> send cmd, unique ID: %s action: %d content: %s\r\n", cmd.uniqueId.c_str(), cmd.action, cmd.content.c_str());
+    return pipeWrapper.SendCmd(cmd, waitDone);
+}
+
 int main()
 {
     do {
-        using namespace PipeCmd;
-
         std::wstring pipeName = LR"(\\.\pipe\{17842D3A-9729-4BCE-AF0C-12E10D3FB70F}-pipe)";
         std::wstring heartbeatEventName/* = LR"({3FE940AC-F7BD-4630-8D7B-2935B80EAFA6}-Heartbeat)"*/;
 
@@ -17,7 +20,7 @@ int main()
         PipeWrapper pipeWrapper(pipeName, heartbeatEventName, PipeType::PipeClient);
 
         pipeWrapper.RegisterCallback(nullptr, [](void* ctx, const PipeCmd::Cmd& cmd) {
-            printf("[PipeClient] <== recv cmd, unique ID: %s action: %d content: %s\r\n", cmd.unique_id().c_str(), cmd.action(), cmd.content().c_str());
+            printf("[PipeClient] <== recv cmd, unique ID: %s action: %d content: %s\r\n", cmd.uniqueId.c_str(), cmd.action, cmd.content.c_str());
             }, [=](void* ctx)-> bool {
             return stop;
             }, [&](void* ctx) {
@@ -28,19 +31,19 @@ int main()
             break;
         }
 
-        Cmd sendCmd;
-        sendCmd.set_action(std::int32_t(CefPipeCmd::Action::LoadUrl));
-        sendCmd.set_content("http://www.google.com");
-        Cmd resultCmd = pipeWrapper.SendCmd(sendCmd);
+        PipeCmd::Cmd sendCmd;
+        sendCmd.action = std::int32_t(CefPipeCmd::Action::LoadUrl);
+        sendCmd.content = "http://www.google.com";
+        PipeCmd::Cmd resultCmd = SendPipeCmd(pipeWrapper, sendCmd, true);
 
         Sleep(1000);
 
         while (true) {
             sendCmd.Clear();
-            sendCmd.set_action(std::int32_t(CefPipeCmd::Action::GetCurrentPageUrl));
-            resultCmd = pipeWrapper.SendCmd(sendCmd);
+            sendCmd.action = std::int32_t(CefPipeCmd::Action::GetCurrentPageUrl);
+            resultCmd = SendPipeCmd(pipeWrapper, sendCmd, true);
 
-            const auto& url = resultCmd.content();
+            const auto& url = resultCmd.content;
             if (url.empty()) {
                 break;
             }

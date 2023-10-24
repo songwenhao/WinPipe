@@ -4,11 +4,14 @@
 #include "pch.h"
 #include "../CefPipeCmd.h"
 
+PipeCmd::Cmd SendPipeCmd(PipeWrapper& pipeWrapper, const PipeCmd::Cmd& cmd, bool waitDone) {
+    printf("[PipeServer] ==> send cmd, unique ID: %s action: %d content: %s\r\n", cmd.uniqueId.c_str(), cmd.action, cmd.content.c_str());
+    return pipeWrapper.SendCmd(cmd, waitDone);
+}
+
 int main()
 {
     do {
-        using namespace PipeCmd;
-
         std::wstring pipeName = LR"(\\.\pipe\{17842D3A-9729-4BCE-AF0C-12E10D3FB70F}-pipe)";
         std::wstring heartbeatEventName/* = LR"({3FE940AC-F7BD-4630-8D7B-2935B80EAFA6}-Heartbeat)"*/;
 
@@ -17,18 +20,18 @@ int main()
         PipeWrapper pipeWrapper(pipeName, heartbeatEventName, PipeType::PipeServer);
 
         pipeWrapper.RegisterCallback(nullptr, [&](void* ctx, const PipeCmd::Cmd& cmd) {
-            printf("[PipeServer] <== recv cmd, unique ID: %s action: %d content: %s\r\n", cmd.unique_id().c_str(), cmd.action(), cmd.content().c_str());
+            printf("[PipeServer] <== recv cmd, unique ID: %s action: %d content: %s\r\n", cmd.uniqueId.c_str(), cmd.action, cmd.content.c_str());
 
-            CefPipeCmd::Action action = (CefPipeCmd::Action)cmd.action();
+            CefPipeCmd::Action action = (CefPipeCmd::Action)cmd.action;
             switch (action) {
             case CefPipeCmd::Action::Unknown:
                 break;
             case CefPipeCmd::Action::LoadUrl:
             {
-                Cmd sendCmd;
-                sendCmd.set_action(cmd.action());
-                sendCmd.set_unique_id(cmd.unique_id());
-                pipeWrapper.SendCmd(sendCmd, false);
+                PipeCmd::Cmd sendCmd;
+                sendCmd.action = cmd.action;
+                sendCmd.uniqueId = cmd.uniqueId;
+                SendPipeCmd(pipeWrapper, sendCmd, false);
             }
             break;
             case CefPipeCmd::Action::Reload:
@@ -39,11 +42,11 @@ int main()
                 break;
             case CefPipeCmd::Action::GetCurrentPageUrl:
             {
-                Cmd sendCmd;
-                sendCmd.set_action(cmd.action());
-                sendCmd.set_unique_id(cmd.unique_id());
-                sendCmd.set_content("http://www.google.com");
-                pipeWrapper.SendCmd(sendCmd, false);
+                PipeCmd::Cmd sendCmd;
+                sendCmd.action = cmd.action;
+                sendCmd.uniqueId = cmd.uniqueId;
+                sendCmd.content = "http://www.google.com";
+                SendPipeCmd(pipeWrapper, sendCmd, false);
             }
             break;
             case CefPipeCmd::Action::CheckDomIsExist:
