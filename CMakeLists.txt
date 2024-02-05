@@ -7,6 +7,8 @@ endif()
 
 message("CMAKE_VERSION=${CMAKE_VERSION}")
 
+set(CMAKE_CONFIGURATION_TYPES "Debug;RelWithDebInfo")
+
 option(BUILD_SHARED_LIBS "Build shared libs" ON)
 option(MSVC_STATIC_RUNTIME "Build static runtime" OFF)
 
@@ -54,13 +56,15 @@ endif()
 
 set(PROJECT_NAME "WinPipe")
 
-project(${PROJECT_NAME} CXX)
+MESSAGE("\n***************************************\nPROJECT_NAME: ${PROJECT_NAME}\n***************************************")
+
+project(${PROJECT_NAME} LANGUAGES CXX)
 
 set(LIBRARY_TYPE SHARED)
 
 set(DEFINITIONS -DUNICODE -D_UNICODE)
 
-if(BUILD_SHARED_LIBS)    
+if(BUILD_SHARED_LIBS)
     set(DEFINITIONS ${DEFINITIONS} -DWinPipe_EXPORTS)
 else()
     set(LIBRARY_TYPE STATIC)
@@ -68,10 +72,9 @@ else()
     set(DEFINITIONS ${DEFINITIONS} -DWinPipe_STATIC)
 endif()
 
-if(MSVC)
-    add_definitions(${DEFINITIONS})
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4251")
-endif()
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /utf-8")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4251")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /utf-8")
 
 set(SOURCE_FILES
     src/PipeWrapper.cpp
@@ -79,13 +82,13 @@ set(SOURCE_FILES
     src/PipeCmd.h
 )
 
-message(${SOURCE_FILES})
-
 add_library(
 	${PROJECT_NAME}
 	${LIBRARY_TYPE}
 	${SOURCE_FILES}
 )
+
+target_compile_definitions(${PROJECT_NAME} PRIVATE ${DEFINITIONS})
 
 set(CMAKE_INSTALL_PREFIX ${PROJECT_BINARY_DIR}/install)
 install(TARGETS ${PROJECT_NAME} LIBRARY DESTINATION lib)

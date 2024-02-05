@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #ifdef WinPipe_STATIC
     #define WinPipe_API
