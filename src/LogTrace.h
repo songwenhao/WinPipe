@@ -11,7 +11,7 @@
 #include <string.h>
 
 namespace LogTrace {
-    inline char* GetLogStrA(const char* format, va_list args) {
+    inline char* GetLogStr(const char* format, va_list args) {
         char* buffer = nullptr;
 
         __try {
@@ -34,86 +34,7 @@ namespace LogTrace {
         return buffer;
     }
 
-    inline void LogCurrentTime() {
-        wchar_t timeBuffer[32];
-        SYSTEMTIME sysTime;
-        memset(&sysTime, 0, sizeof(SYSTEMTIME));
-        GetSystemTime(&sysTime);
-
-        _snwprintf_s(timeBuffer, _countof(timeBuffer), _TRUNCATE, L"[%04u/%02u/%02u %02u:%02u:%02u]", sysTime.wYear,
-            sysTime.wMonth, sysTime.wDay, sysTime.wHour + 8, sysTime.wMinute, sysTime.wSecond);
-
-#ifdef _CONSOLE
-        wprintf(timeBuffer);
-        OutputDebugStringW(timeBuffer);
-#else
-        OutputDebugStringW(timeBuffer);
-#endif
-    }
-
-    inline void LogExA(const char* format, va_list args) {
-        char* buffer = GetLogStrA(format, args);
-        if (buffer) {
-
-#ifdef _CONSOLE
-            printf(buffer);
-            OutputDebugStringA(buffer);
-#else
-            OutputDebugStringA(buffer);
-#endif
-            free(buffer);
-        }
-    }
-
-    inline void LogA(const char* format, ...) {
-#ifndef _DEBUG
-        return;
-#endif
-        va_list args;
-        va_start(args, format);
-
-        LogExA(format, args);
-
-        va_end(args);
-    }
-
-    inline void LogWithTimeA(const char* format, ...) {
-#ifndef _DEBUG
-        return;
-#endif
-        va_list args;
-        va_start(args, format);
-
-        LogCurrentTime();
-
-        LogExA(format, args);
-
-        va_end(args);
-}
-
-    // release模式也会打印日志
-    inline void ForceLogA(const char* format, ...) {
-        va_list args;
-        va_start(args, format);
-
-        LogExA(format, args);
-
-        va_end(args);
-    }
-
-    // release模式也会打印日志
-    inline void ForceLogWithTimeA(const char* format, ...) {
-        va_list args;
-        va_start(args, format);
-
-        LogCurrentTime();
-
-        LogExA(format, args);
-
-        va_end(args);
-    }
-
-    inline wchar_t* GetLogStrW(const wchar_t* format, va_list args) {
+    inline wchar_t* GetLogStr(const wchar_t* format, va_list args) {
         wchar_t* buffer = nullptr;
 
         __try {
@@ -136,8 +57,40 @@ namespace LogTrace {
         return buffer;
     }
 
-    inline void LogExW(const wchar_t* format, va_list args) {
-        wchar_t* buffer = GetLogStrW(format, args);
+    inline void GetCurrentTimeString(char buffer[], size_t bufferSizeInCharacters) {
+        SYSTEMTIME sysTime;
+        memset(&sysTime, 0, sizeof(SYSTEMTIME));
+        GetLocalTime(&sysTime);
+
+        _snprintf_s(buffer, bufferSizeInCharacters, _TRUNCATE, "[%04u/%02u/%02u %02u:%02u:%02u]", sysTime.wYear,
+            sysTime.wMonth, sysTime.wDay, sysTime.wHour, sysTime.wMinute, sysTime.wSecond);
+    }
+
+    inline void GetCurrentTimeString(wchar_t buffer[], size_t bufferSizeInCharacters) {
+        SYSTEMTIME sysTime;
+        memset(&sysTime, 0, sizeof(SYSTEMTIME));
+        GetLocalTime(&sysTime);
+
+        _snwprintf_s(buffer, bufferSizeInCharacters, _TRUNCATE, L"[%04u/%02u/%02u %02u:%02u:%02u]", sysTime.wYear,
+            sysTime.wMonth, sysTime.wDay, sysTime.wHour, sysTime.wMinute, sysTime.wSecond);
+    }
+
+    inline void LogEx(const char* format, va_list args) {
+        char* buffer = GetLogStr(format, args);
+        if (buffer) {
+
+#ifdef _CONSOLE
+            printf(buffer);
+            OutputDebugStringA(buffer);
+#else
+            OutputDebugStringA(buffer);
+#endif
+            free(buffer);
+        }
+    }
+
+    inline void LogEx(const wchar_t* format, va_list args) {
+        wchar_t* buffer = GetLogStr(format, args);
         if (buffer) {
 #ifdef _CONSOLE
             wprintf(buffer);
@@ -146,105 +99,331 @@ namespace LogTrace {
             OutputDebugStringW(buffer);
 #endif
             free(buffer);
-        }
     }
+}
 
-    inline void LogW(const wchar_t* format, ...) {
+    inline void Log(const char* format, ...) {
 #ifndef _DEBUG
         return;
 #endif
         va_list args;
         va_start(args, format);
 
-        LogExW(format, args);
+        LogEx(format, args);
 
         va_end(args);
     }
 
-    inline void LogWithTimeW(const wchar_t* format, ...) {
+    inline void Log(const wchar_t* format, ...) {
 #ifndef _DEBUG
         return;
 #endif
         va_list args;
         va_start(args, format);
 
-        LogCurrentTime();
+        LogEx(format, args);
 
-        LogExW(format, args);
+        va_end(args);
+    }
+
+    inline void LogWithTime(const char* format, ...) {
+#ifndef _DEBUG
+        return;
+#endif
+        va_list args;
+        va_start(args, format);
+
+        wchar_t buffer[32];
+        memset(buffer, 0, sizeof(buffer));
+        GetCurrentTimeString(buffer, _countof(buffer));
+
+#ifdef _CONSOLE
+        wprintf(buffer);
+        OutputDebugStringW(buffer);
+#else
+        OutputDebugStringW(buffer);
+#endif
+
+        LogEx(format, args);
+
+        va_end(args);
+}
+
+    inline void LogWithTime(const wchar_t* format, ...) {
+#ifndef _DEBUG
+        return;
+#endif
+        va_list args;
+        va_start(args, format);
+
+        wchar_t buffer[32];
+        memset(buffer, 0, sizeof(buffer));
+        GetCurrentTimeString(buffer, _countof(buffer));
+
+#ifdef _CONSOLE
+        wprintf(buffer);
+        OutputDebugStringW(buffer);
+#else
+        OutputDebugStringW(buffer);
+#endif
+
+        LogEx(format, args);
 
         va_end(args);
     }
 
     // release模式也会打印日志
-    inline void ForceLogW(const wchar_t* format, ...) {
+    inline void ForceLog(const char* format, ...) {
         va_list args;
         va_start(args, format);
 
-        LogExW(format, args);
+        LogEx(format, args);
 
         va_end(args);
     }
 
     // release模式也会打印日志
-    inline void ForceLogWithTimeW(const wchar_t* format, ...) {
+    inline void ForceLog(const wchar_t* format, ...) {
         va_list args;
         va_start(args, format);
 
-        LogCurrentTime();
-
-        LogExW(format, args);
+        LogEx(format, args);
 
         va_end(args);
     }
 
-    inline void LogToFileA(const char* logFile, const char* format, ...) {
+    // release模式也会打印日志
+    inline void ForceLogWithTime(const char* format, ...) {
         va_list args;
         va_start(args, format);
 
-        char* buffer = GetLogStrA(format, args);
-        if (buffer) {
-            DWORD writeBytes = 0;
-            HANDLE fileHandle = CreateFileA(logFile, GENERIC_WRITE, FILE_SHARE_READ, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-            if (fileHandle != INVALID_HANDLE_VALUE) {
-                SetFilePointer(fileHandle, 0, 0, FILE_END);
+        wchar_t buffer[32];
+        memset(buffer, 0, sizeof(buffer));
+        GetCurrentTimeString(buffer, _countof(buffer));
 
-                WriteFile(fileHandle, buffer, (DWORD)strlen(buffer), &writeBytes, NULL);
-                CloseHandle(fileHandle);
-            }
+#ifdef _CONSOLE
+        wprintf(buffer);
+        OutputDebugStringW(buffer);
+#else
+        OutputDebugStringW(buffer);
+#endif
 
-            free(buffer);
+        LogEx(format, args);
+
+        va_end(args);
+    }
+
+    // release模式也会打印日志
+    inline void ForceLogWithTime(const wchar_t* format, ...) {
+        va_list args;
+        va_start(args, format);
+
+        wchar_t buffer[32];
+        memset(buffer, 0, sizeof(buffer));
+        GetCurrentTimeString(buffer, _countof(buffer));
+
+#ifdef _CONSOLE
+        wprintf(buffer);
+        OutputDebugStringW(buffer);
+#else
+        OutputDebugStringW(buffer);
+#endif
+
+        LogEx(format, args);
+
+        va_end(args);
+    }
+
+    inline void WriteLogToFile(const char* logFile, const char* logContent, size_t logContentSize) {
+        DWORD writeBytes = 0;
+        HANDLE fileHandle = CreateFileA(logFile, GENERIC_WRITE, FILE_SHARE_READ, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (fileHandle != INVALID_HANDLE_VALUE) {
+            SetFilePointer(fileHandle, 0, 0, FILE_END);
+
+            WriteFile(fileHandle, logContent, (DWORD)logContentSize, &writeBytes, NULL);
+            CloseHandle(fileHandle);
         }
-
-        va_end(args);
     }
 
-    inline void LogToFileW(const wchar_t* logFile, const wchar_t* format, ...) {
+    inline void WriteLogToFile(const wchar_t* logFile, const char* logContent, size_t logContentSize) {
+        DWORD writeBytes = 0;
+        HANDLE fileHandle = CreateFileW(logFile, GENERIC_WRITE, FILE_SHARE_READ, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (fileHandle != INVALID_HANDLE_VALUE) {
+            SetFilePointer(fileHandle, 0, 0, FILE_END);
+
+            WriteFile(fileHandle, logContent, (DWORD)logContentSize, &writeBytes, NULL);
+            CloseHandle(fileHandle);
+        }
+    }
+
+    inline void WriteLogToFile(const char* logFile, const wchar_t* logContent, size_t logContentSize) {
         const unsigned char head[] = { 0xFF, 0xFE };
-        
+        DWORD writeBytes = 0;
+        HANDLE fileHandle = CreateFileA(logFile, GENERIC_WRITE, FILE_SHARE_READ, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (fileHandle != INVALID_HANDLE_VALUE) {
+            // 首次创建文件写入UTF16 BOM头
+            if (0 == GetLastError()) {
+                WriteFile(fileHandle, head, (DWORD)sizeof(head), &writeBytes, NULL);
+            }
+
+            SetFilePointer(fileHandle, 0, 0, FILE_END);
+
+            WriteFile(fileHandle, logContent, (DWORD)logContentSize, &writeBytes, NULL);
+
+            CloseHandle(fileHandle);
+        }
+    }
+
+    inline void WriteLogToFile(const wchar_t* logFile, const wchar_t* logContent, size_t logContentSize) {
+        const unsigned char head[] = { 0xFF, 0xFE };
+        DWORD writeBytes = 0;
+        HANDLE fileHandle = CreateFileW(logFile, GENERIC_WRITE, FILE_SHARE_READ, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (fileHandle != INVALID_HANDLE_VALUE) {
+            // 首次创建文件写入UTF16 BOM头
+            if (0 == GetLastError()) {
+                WriteFile(fileHandle, head, (DWORD)sizeof(head), &writeBytes, NULL);
+            }
+
+            SetFilePointer(fileHandle, 0, 0, FILE_END);
+
+            WriteFile(fileHandle, logContent, (DWORD)logContentSize, &writeBytes, NULL);
+
+            CloseHandle(fileHandle);
+        }
+    }
+
+    inline void LogToFile(const char* logFile, const char* format, ...) {
         va_list args;
         va_start(args, format);
 
-        wchar_t* buffer = GetLogStrW(format, args);
-        if (buffer) {
-            DWORD writeBytes = 0;
-            HANDLE fileHandle = CreateFileW(logFile, GENERIC_WRITE, FILE_SHARE_READ, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-            if (fileHandle != INVALID_HANDLE_VALUE) {
-                // 首次创建文件写入UTF16 BOM头
-                if (0 == GetLastError()) {
-                    WriteFile(fileHandle, head, (DWORD)sizeof(head), &writeBytes, NULL);
-                }
+        char* logContent = GetLogStr(format, args);
+        if (logContent) {
+            WriteLogToFile(logFile, logContent, strlen(logContent));
 
-                SetFilePointer(fileHandle, 0, 0, FILE_END);
-
-                WriteFile(fileHandle, buffer, (DWORD)(wcslen(buffer) * sizeof(buffer[0])), &writeBytes, NULL);
-                CloseHandle(fileHandle);
-
-                free(buffer);
-            }
+            free(logContent);
         }
 
         va_end(args);
     }
+
+    inline void LogToFile(const wchar_t* logFile, const char* format, ...) {
+        va_list args;
+        va_start(args, format);
+
+        char* logContent = GetLogStr(format, args);
+        if (logContent) {
+            WriteLogToFile(logFile, logContent, strlen(logContent));
+
+            free(logContent);
+        }
+
+        va_end(args);
+    }
+
+    inline void LogToFile(const char* logFile, const wchar_t* format, ...) {
+        va_list args;
+        va_start(args, format);
+
+        wchar_t* logContent = GetLogStr(format, args);
+        if (logContent) {
+            WriteLogToFile(logFile, logContent, wcslen(logContent) * sizeof(logContent[0]));
+
+            free(logContent);
+        }
+
+        va_end(args);
+    }
+
+    inline void LogToFile(const wchar_t* logFile, const wchar_t* format, ...) {
+        va_list args;
+        va_start(args, format);
+
+        wchar_t* logContent = GetLogStr(format, args);
+        if (logContent) {
+            WriteLogToFile(logFile, logContent, wcslen(logContent) * sizeof(logContent[0]));
+
+            free(logContent);
+        }
+
+        va_end(args);
+    }
+
+    inline void LogToFileWithTime(const char* logFile, const char* format, ...) {
+        va_list args;
+        va_start(args, format);
+
+        char* logContent = GetLogStr(format, args);
+        if (logContent) {
+            char timeBuffer[32];
+            memset(timeBuffer, 0, sizeof(timeBuffer));
+            GetCurrentTimeString(timeBuffer, _countof(timeBuffer));
+            WriteLogToFile(logFile, timeBuffer, strlen(timeBuffer));
+
+            WriteLogToFile(logFile, logContent, strlen(logContent));
+
+            free(logContent);
+        }
+
+        va_end(args);
+    }
+
+    inline void LogToFileWithTime(const wchar_t* logFile, const char* format, ...) {
+        va_list args;
+        va_start(args, format);
+
+        char* logContent = GetLogStr(format, args);
+        if (logContent) {
+            char timeBuffer[32];
+            memset(timeBuffer, 0, sizeof(timeBuffer));
+            GetCurrentTimeString(timeBuffer, _countof(timeBuffer));
+            WriteLogToFile(logFile, timeBuffer, strlen(timeBuffer));
+
+            WriteLogToFile(logFile, logContent, strlen(logContent));
+
+            free(logContent);
+        }
+
+        va_end(args);
+    }
+
+    inline void LogToFileWithTime(const char* logFile, const wchar_t* format, ...) {
+        va_list args;
+        va_start(args, format);
+
+        wchar_t* logContent = GetLogStr(format, args);
+        if (logContent) {
+            wchar_t timeBuffer[32];
+            memset(timeBuffer, 0, sizeof(timeBuffer));
+            GetCurrentTimeString(timeBuffer, _countof(timeBuffer));
+            WriteLogToFile(logFile, timeBuffer, wcslen(timeBuffer) * sizeof(timeBuffer[0]));
+
+            WriteLogToFile(logFile, logContent, wcslen(logContent) * sizeof(logContent[0]));
+
+            free(logContent);
+        }
+
+        va_end(args);
+    }
+
+    inline void LogToFileWithTime(const wchar_t* logFile, const wchar_t* format, ...) {
+        va_list args;
+        va_start(args, format);
+
+        wchar_t* logContent = GetLogStr(format, args);
+        if (logContent) {
+            wchar_t timeBuffer[32];
+            memset(timeBuffer, 0, sizeof(timeBuffer));
+            GetCurrentTimeString(timeBuffer, _countof(timeBuffer));
+            WriteLogToFile(logFile, timeBuffer, wcslen(timeBuffer) * sizeof(timeBuffer[0]));
+
+            WriteLogToFile(logFile, logContent, wcslen(logContent) * sizeof(logContent[0]));
+
+            free(logContent);
+        }
+
+        va_end(args);
+    }
+
 }
 
 #endif //LOGTRACE_H
